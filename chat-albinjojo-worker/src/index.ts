@@ -175,6 +175,118 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
       const stub = env.ROOM.get(id);
       return stub.fetch(request);
     }
+    if (url.pathname === "/api/notes" && request.method === "POST") {
+      if (!(await isAuthenticated(request, env))) {
+        return new Response(JSON.stringify({ error: "Not authorized" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const { title, content } = await request.json<{
+        title?: string;
+        content: string;
+      }>();
+
+      if (!content) {
+        return new Response(JSON.stringify({ error: "content required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (content.length > 10000) {
+        return new Response(JSON.stringify({ error: "content too long (max 10000 chars)" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const id = crypto.randomUUID();
+      const createdAt = Date.now();
+
+      await env.DB
+        .prepare("INSERT INTO notes (id, title, content, created_at) VALUES (?, ?, ?, ?)")
+        .bind(id, title || null, content, createdAt)
+        .run();
+
+      return new Response(JSON.stringify({ id }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    if (url.pathname === "/api/notes" && request.method === "GET") {
+      if (!(await isAuthenticated(request, env))) {
+        return new Response(JSON.stringify({ error: "Not authorized" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const { results } = await env.DB
+        .prepare("SELECT id, title, content, created_at FROM notes ORDER BY created_at DESC")
+        .all();
+
+      return new Response(JSON.stringify({ notes: results }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }const noteMatch = url.pathname.match(/^\/api\/notes\/([^/]+)$/);
+    if (noteMatch && request.method === "PATCH") {
+      if (!(await isAuthenticated(request, env))) {
+        return new Response(JSON.stringify({ error: "Not authorized" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const id = noteMatch[1];
+      const { title, content } = await request.json<{
+        title?: string;
+        content: string;
+      }>();
+
+      if (!content) {
+        return new Response(JSON.stringify({ error: "content required" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      if (content.length > 10000) {
+        return new Response(JSON.stringify({ error: "content too long (max 10000 chars)" }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      await env.DB
+        .prepare("UPDATE notes SET title = ?, content = ? WHERE id = ?")
+        .bind(title || null, content, id)
+        .run();
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    if (noteMatch && request.method === "DELETE") {
+      if (!(await isAuthenticated(request, env))) {
+        return new Response(JSON.stringify({ error: "Not authorized" }), {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      const id = noteMatch[1];
+      await env.DB.prepare("DELETE FROM notes WHERE id = ?").bind(id).run();
+
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
     return new Response("Not found", { status: 404 });
   },
 };
