@@ -3,6 +3,7 @@ export { RoomSignal };
 
 interface Env {
   DB: D1Database;
+  ROOM: DurableObjectNamespace;
 }
 
 async function hashPassword(password: string): Promise<string> {
@@ -166,6 +167,13 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
         status: 200,
         headers: { "Content-Type": "application/json" },
       });
+    }
+    const wsMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/ws$/);
+    if (wsMatch) {
+      const slug = wsMatch[1];
+      const id = env.ROOM.idFromName(slug);
+      const stub = env.ROOM.get(id);
+      return stub.fetch(request);
     }
     return new Response("Not found", { status: 404 });
   },
