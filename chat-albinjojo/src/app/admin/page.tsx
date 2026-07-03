@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
 
 const WORKER_URL = "http://127.0.0.1:8787";
 
 interface Room {
   slug: string;
+  name: string;
   question: string;
   created_at: number;
 }
@@ -24,13 +25,18 @@ export default function AdminPage() {
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [rooms, setRooms] = useState<Room[]>([]);
+  const [newName, setNewName] = useState("");
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
+  const [newMaxGuests, setNewMaxGuests] = useState(1);
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [vanishOn, setVanishOn] = useState(true);
+  const [vanishOn, setVanishOn] = useState(false);
+  const vanishOnRef = useRef(vanishOn);
+  vanishOnRef.current = vanishOn;
   const [input, setInput] = useState("");
-  const [connection, setConnection] = useState<ChatConnection | null>(null);
+ const [connection, setConnection] = useState<ChatConnection | null>(null);
+  const peerNickname = useRef<string>("them");
 
   useEffect(() => {
     const saved = localStorage.getItem("session_token");
@@ -48,7 +54,7 @@ export default function AdminPage() {
     const id = crypto.randomUUID();
     setMessages((prev) => [...prev, { id, from, text, fading: false }]);
 
-    if (vanishOn) {
+    if (vanishOnRef.current) {
       setTimeout(() => {
         setMessages((prev) =>
           prev.map((m) => (m.id === id ? { ...m, fading: true } : m))
@@ -79,7 +85,7 @@ export default function AdminPage() {
   }
 
   async function createRoom() {
-    if (!newQuestion.trim() || !newAnswer.trim()) return;
+    if (!newName.trim() || !newQuestion.trim() || !newAnswer.trim()) return;
 
     const res = await fetch(`${WORKER_URL}/api/rooms`, {
       method: "POST",
@@ -87,11 +93,12 @@ export default function AdminPage() {
         "Content-Type": "application/json",
         "X-Session-Token": token!,
       },
-      body: JSON.stringify({ question: newQuestion, answer: newAnswer }),
+      body: JSON.stringify({ name: newName, question: newQuestion, answer: newAnswer }),
     });
     const data = await res.json();
 
     if (data.slug) {
+      setNewName("");
       setNewQuestion("");
       setNewAnswer("");
       const roomsRes = await fetch(`${WORKER_URL}/api/rooms`);
@@ -100,20 +107,32 @@ export default function AdminPage() {
     }
   }
 
+  async function deleteRoom(slug: string) {
+    await fetch(`${WORKER_URL}/api/rooms/${slug}`, {
+      method: "DELETE",
+      headers: { "X-Session-Token": token! },
+    });
+    setRooms((prev) => prev.filter((r) => r.slug !== slug));
+    if (activeSlug === slug) setActiveSlug(null);
+  }
+
   async function openRoom(slug: string) {
     setActiveSlug(slug);
     setMessages([]);
-    const conn = await connectToRoom(
+   const conn = await connectToRoom(
       slug,
       "owner",
       undefined,
       (raw) => {
         const data = JSON.parse(raw);
-        if (data.type === "text") {
-          addMessage("them", data.text);
+        if (data.type === "nickname") {
+          peerNickname.current = data.nickname;
+        } else if (data.type === "text") {
+          addMessage(peerNickname.current, data.text);
         }
       },
-      () => {}
+      () => {},
+      newMaxGuests
     );
     setConnection(conn);
   }
@@ -152,6 +171,11 @@ export default function AdminPage() {
         <h3>Rooms</h3>
         <div style={{ marginBottom: "1rem" }}>
           <input
+            placeholder="Room name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+          />
+          <input
             placeholder="Question"
             value={newQuestion}
             onChange={(e) => setNewQuestion(e.target.value)}
@@ -161,11 +185,21 @@ export default function AdminPage() {
             value={newAnswer}
             onChange={(e) => setNewAnswer(e.target.value)}
           />
+          <input
+            type="number"
+            min={1}
+            placeholder="Max guests"
+            value={newMaxGuests}
+            onChange={(e) => setNewMaxGuests(Number(e.target.value))}
+          />
           <button onClick={createRoom}>Create Room</button>
         </div>
         {rooms.map((r) => (
-          <div key={r.slug} onClick={() => openRoom(r.slug)} style={{ cursor: "pointer" }}>
-            {r.question}
+          <div key={r.slug} style={{ display: "flex", justifyContent: "space-between" }}>
+            <span onClick={() => openRoom(r.slug)} style={{ cursor: "pointer" }}>
+              {r.name}
+            </span>
+            <button onClick={() => deleteRoom(r.slug)}>×</button>
           </div>
         ))}
       </div>

@@ -85,13 +85,14 @@ export default {
         return json({ error: "Not authorized" }, 403);
       }
 
-      const { question, answer } = await request.json<{
+     const { name, question, answer } = await request.json<{
+        name: string;
         question: string;
         answer: string;
       }>();
 
-      if (!question || !answer) {
-        return json({ error: "question and answer required" }, 400);
+      if (!name || !question || !answer) {
+        return json({ error: "name, question and answer required" }, 400);
       }
 
       const slug = crypto.randomUUID().slice(0, 8);
@@ -99,16 +100,16 @@ export default {
       const createdAt = Date.now();
 
       await env.DB
-        .prepare("INSERT INTO rooms (slug, question, answer_hash, created_at) VALUES (?, ?, ?, ?)")
-        .bind(slug, question, answerHash, createdAt)
+        .prepare("INSERT INTO rooms (slug, name, question, answer_hash, created_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(slug, name, question, answerHash, createdAt)
         .run();
 
       return json({ slug, url: `/r/${slug}` });
     }
 
-    if (url.pathname === "/api/rooms" && request.method === "GET") {
+   if (url.pathname === "/api/rooms" && request.method === "GET") {
       const { results } = await env.DB
-        .prepare("SELECT slug, question, created_at FROM rooms ORDER BY created_at DESC")
+        .prepare("SELECT slug, name, question, created_at FROM rooms ORDER BY created_at DESC")
         .all();
 
       return json({ rooms: results });
@@ -136,10 +137,10 @@ export default {
     }
 
     const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
-    if (deleteMatch && request.method === "GET") {
+   if (deleteMatch && request.method === "GET") {
       const slug = deleteMatch[1];
       const room = await env.DB
-        .prepare("SELECT slug, question, created_at FROM rooms WHERE slug = ?")
+        .prepare("SELECT slug, name, question, created_at FROM rooms WHERE slug = ?")
         .bind(slug)
         .first();
 

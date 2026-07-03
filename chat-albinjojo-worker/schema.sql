@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS notes (
   title TEXT,
   content TEXT NOT NULL,
   created_at INTEGER NOT NULL
-);*/
+);
 
 CREATE TABLE IF NOT EXISTS admin (
   username TEXT PRIMARY KEY,
@@ -21,4 +21,12 @@ CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
+);*/
+
+CREATE TABLE IF NOT EXISTS rooms (
+  slug TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  question TEXT NOT NULL,
+  answer_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL
 );

@@ -23,7 +23,9 @@ export default function RoomPage() {
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [vanishOn, setVanishOn] = useState(true);
+  const [vanishOn, setVanishOn] = useState(false);
+  const vanishOnRef = useRef(vanishOn);
+  vanishOnRef.current = vanishOn;
   const [input, setInput] = useState("");
   const connectionRef = useRef<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
@@ -39,7 +41,7 @@ export default function RoomPage() {
     const id = crypto.randomUUID();
     setMessages((prev) => [...prev, { id, from, text, fading: false }]);
 
-    if (vanishOn) {
+    if (vanishOnRef.current) {
       setTimeout(() => {
         setMessages((prev) =>
           prev.map((m) => (m.id === id ? { ...m, fading: true } : m))
