@@ -45,15 +45,19 @@ export async function connectToRoom(
   ws.onmessage = async (event) => {
     const msg = JSON.parse(event.data);
 
-    if (msg.type === "offer") {
-      await peer.setRemoteDescription(msg.offer);
-      const answer = await peer.createAnswer();
-      await peer.setLocalDescription(answer);
-      ws.send(JSON.stringify({ type: "answer", answer }));
+   if (msg.type === "offer") {
+      if (peer.signalingState === "stable" || peer.signalingState === "have-remote-offer") {
+        await peer.setRemoteDescription(msg.offer);
+        const answer = await peer.createAnswer();
+        await peer.setLocalDescription(answer);
+        ws.send(JSON.stringify({ type: "answer", answer }));
+      }
     }
 
     if (msg.type === "answer") {
-      await peer.setRemoteDescription(msg.answer);
+      if (peer.signalingState === "have-local-offer") {
+        await peer.setRemoteDescription(msg.answer);
+      }
     }
 
     if (msg.type === "ice") {
