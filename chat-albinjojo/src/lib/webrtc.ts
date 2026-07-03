@@ -52,6 +52,7 @@ export async function connectToRoom(
   // 4. Handle whatever the other side sends us through signaling
   ws.onmessage = async (event) => {
     const msg = JSON.parse(event.data);
+    console.log(`[${role}] received signal:`, msg.type);
 
     if (msg.type === "offer") {
       await peer.setRemoteDescription(msg.offer);
@@ -71,11 +72,21 @@ export async function connectToRoom(
 
   // 5. Once the signaling socket is open, the owner kicks off the handshake
   ws.onopen = async () => {
+    console.log(`[${role}] WebSocket connected`);
     if (role === "owner") {
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
       ws.send(JSON.stringify({ type: "offer", offer }));
+      console.log(`[${role}] sent offer`);
     }
+  };
+
+  ws.onerror = (err) => {
+    console.error(`[${role}] WebSocket error`, err);
+  };
+
+  ws.onclose = (event) => {
+    console.log(`[${role}] WebSocket closed`, event.code, event.reason);
   };
 
   return {

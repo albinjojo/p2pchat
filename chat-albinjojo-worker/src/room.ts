@@ -20,6 +20,7 @@ export class RoomSignal {
 
     const session: Session = { ws: server };
     this.sessions.push(session);
+    console.log(`Session joined. Total sessions: ${this.sessions.length}`);
 
     server.addEventListener("message", (event) => {
       const other = this.sessions.find((s) => s !== session);
@@ -28,6 +29,7 @@ export class RoomSignal {
 
     server.addEventListener("close", () => {
       this.sessions = this.sessions.filter((s) => s !== session);
+      console.log(`Session left. Total sessions: ${this.sessions.length}`);
     });
 
     return new Response(null, { status: 101, webSocket: client });
