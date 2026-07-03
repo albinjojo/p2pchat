@@ -6,6 +6,19 @@ interface Env {
   ROOM: DurableObjectNamespace;
 }
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, X-Session-Token",
+};
+
+function json(data: unknown, status = 200): Response {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "Content-Type": "application/json", ...corsHeaders },
+  });
+}
+
 async function hashPassword(password: string): Promise<string> {
   const data = new TextEncoder().encode(password);
   const digest = await crypto.subtle.digest("SHA-256", data);
@@ -33,6 +46,10 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    if (request.method === "OPTIONS") {
+      return new Response(null, { headers: corsHeaders });
+    }
+
     if (url.pathname === "/api/login" && request.method === "POST") {
       const { username, password } = await request.json<{
         username: string;
@@ -44,20 +61,11 @@ export default {
         .bind(username)
         .first<{ password_hash: string }>();
 
-      if (!row) {
-        return new Response(JSON.stringify({ error: "Invalid credentials" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+      if (!row) return json({ error: "Invalid credentials" }, 401);
 
       const hashedAttempt = await hashPassword(password);
-
       if (hashedAttempt !== row.password_hash) {
-        return new Response(JSON.stringify({ error: "Invalid credentials" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Invalid credentials" }, 401);
       }
 
       const token = crypto.randomUUID();
@@ -69,29 +77,21 @@ export default {
         .bind(token, now, expiresAt)
         .run();
 
-      return new Response(JSON.stringify({ token }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ token });
     }
 
     if (url.pathname === "/api/rooms" && request.method === "POST") {
       if (!(await isAuthenticated(request, env))) {
-        return new Response(JSON.stringify({ error: "Not authorized" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Not authorized" }, 403);
       }
-     const { question, answer } = await request.json<{
+
+      const { question, answer } = await request.json<{
         question: string;
         answer: string;
       }>();
 
       if (!question || !answer) {
-        return new Response(JSON.stringify({ error: "question and answer required" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "question and answer required" }, 400);
       }
 
       const slug = crypto.randomUUID().slice(0, 8);
@@ -103,22 +103,18 @@ export default {
         .bind(slug, question, answerHash, createdAt)
         .run();
 
-      return new Response(JSON.stringify({ slug, url: `/r/${slug}` }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ slug, url: `/r/${slug}` });
     }
-	if (url.pathname === "/api/rooms" && request.method === "GET") {
+
+    if (url.pathname === "/api/rooms" && request.method === "GET") {
       const { results } = await env.DB
         .prepare("SELECT slug, question, created_at FROM rooms ORDER BY created_at DESC")
         .all();
 
-      return new Response(JSON.stringify({ rooms: results }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ rooms: results });
     }
-	const verifyMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/verify$/);
+
+    const verifyMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/verify$/);
     if (verifyMatch && request.method === "POST") {
       const slug = verifyMatch[1];
       const { answer } = await request.json<{ answer: string }>();
@@ -128,46 +124,28 @@ export default {
         .bind(slug)
         .first<{ answer_hash: string }>();
 
-      if (!room) {
-        return new Response(JSON.stringify({ error: "Room not found" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
+      if (!room) return json({ error: "Room not found" }, 404);
 
       const attemptHash = await hashPassword(answer || "");
-
       if (attemptHash !== room.answer_hash) {
-        return new Response(JSON.stringify({ ok: false, error: "Wrong answer" }), {
-          status: 401,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ ok: false, error: "Wrong answer" }, 401);
       }
 
       const access = crypto.randomUUID();
-
-      return new Response(JSON.stringify({ ok: true, access }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ ok: true, access });
     }
-const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
+
+    const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
     if (deleteMatch && request.method === "DELETE") {
       if (!(await isAuthenticated(request, env))) {
-        return new Response(JSON.stringify({ error: "Not authorized" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Not authorized" }, 403);
       }
 
       const slug = deleteMatch[1];
       await env.DB.prepare("DELETE FROM rooms WHERE slug = ?").bind(slug).run();
-
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ ok: true });
     }
+
     const wsMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)\/ws$/);
     if (wsMatch) {
       const slug = wsMatch[1];
@@ -175,12 +153,10 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
       const stub = env.ROOM.get(id);
       return stub.fetch(request);
     }
+
     if (url.pathname === "/api/notes" && request.method === "POST") {
       if (!(await isAuthenticated(request, env))) {
-        return new Response(JSON.stringify({ error: "Not authorized" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Not authorized" }, 403);
       }
 
       const { title, content } = await request.json<{
@@ -188,18 +164,9 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
         content: string;
       }>();
 
-      if (!content) {
-        return new Response(JSON.stringify({ error: "content required" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
+      if (!content) return json({ error: "content required" }, 400);
       if (content.length > 10000) {
-        return new Response(JSON.stringify({ error: "content too long (max 10000 chars)" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "content too long (max 10000 chars)" }, 400);
       }
 
       const id = crypto.randomUUID();
@@ -210,34 +177,25 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
         .bind(id, title || null, content, createdAt)
         .run();
 
-      return new Response(JSON.stringify({ id }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ id });
     }
+
     if (url.pathname === "/api/notes" && request.method === "GET") {
       if (!(await isAuthenticated(request, env))) {
-        return new Response(JSON.stringify({ error: "Not authorized" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Not authorized" }, 403);
       }
 
       const { results } = await env.DB
         .prepare("SELECT id, title, content, created_at FROM notes ORDER BY created_at DESC")
         .all();
 
-      return new Response(JSON.stringify({ notes: results }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }const noteMatch = url.pathname.match(/^\/api\/notes\/([^/]+)$/);
+      return json({ notes: results });
+    }
+
+    const noteMatch = url.pathname.match(/^\/api\/notes\/([^/]+)$/);
     if (noteMatch && request.method === "PATCH") {
       if (!(await isAuthenticated(request, env))) {
-        return new Response(JSON.stringify({ error: "Not authorized" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Not authorized" }, 403);
       }
 
       const id = noteMatch[1];
@@ -246,18 +204,9 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
         content: string;
       }>();
 
-      if (!content) {
-        return new Response(JSON.stringify({ error: "content required" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-
+      if (!content) return json({ error: "content required" }, 400);
       if (content.length > 10000) {
-        return new Response(JSON.stringify({ error: "content too long (max 10000 chars)" }), {
-          status: 400,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "content too long (max 10000 chars)" }, 400);
       }
 
       await env.DB
@@ -265,28 +214,19 @@ const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
         .bind(title || null, content, id)
         .run();
 
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ ok: true });
     }
 
     if (noteMatch && request.method === "DELETE") {
       if (!(await isAuthenticated(request, env))) {
-        return new Response(JSON.stringify({ error: "Not authorized" }), {
-          status: 403,
-          headers: { "Content-Type": "application/json" },
-        });
+        return json({ error: "Not authorized" }, 403);
       }
 
       const id = noteMatch[1];
       await env.DB.prepare("DELETE FROM notes WHERE id = ?").bind(id).run();
-
-      return new Response(JSON.stringify({ ok: true }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
+      return json({ ok: true });
     }
-    return new Response("Not found", { status: 404 });
+
+    return json({ error: "Not found" }, 404);
   },
 };
