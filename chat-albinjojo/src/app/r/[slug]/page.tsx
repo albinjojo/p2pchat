@@ -19,7 +19,11 @@ export default function RoomPage() {
   const connectionRef = useRef<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
 
+  const connecting = useRef(false);
+
   async function handleVerify() {
+    if (connecting.current) return;
+    connecting.current = true;
     setError("");
     const res = await fetch(`${WORKER_URL}/api/rooms/${slug}/verify`, {
       method: "POST",
