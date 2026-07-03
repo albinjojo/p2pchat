@@ -147,13 +147,14 @@ export default {
       if (!room) return json({ error: "Room not found" }, 404);
       return json(room);
     }
-    if (deleteMatch && request.method === "DELETE") {
+ if (deleteMatch && request.method === "DELETE") {
       if (!(await isAuthenticated(request, env))) {
         return json({ error: "Not authorized" }, 403);
       }
 
       const slug = deleteMatch[1];
       await env.DB.prepare("DELETE FROM rooms WHERE slug = ?").bind(slug).run();
+      await env.DB.prepare("DELETE FROM notes WHERE room_slug = ?").bind(slug).run();
       return json({ ok: true });
     }
 
@@ -170,9 +171,10 @@ export default {
         return json({ error: "Not authorized" }, 403);
       }
 
-      const { title, content } = await request.json<{
+      const { title, content, room_slug } = await request.json<{
         title?: string;
         content: string;
+        room_slug?: string;
       }>();
 
       if (!content) return json({ error: "content required" }, 400);
@@ -184,25 +186,31 @@ export default {
       const createdAt = Date.now();
 
       await env.DB
-        .prepare("INSERT INTO notes (id, title, content, created_at) VALUES (?, ?, ?, ?)")
-        .bind(id, title || null, content, createdAt)
+        .prepare("INSERT INTO notes (id, title, content, room_slug, created_at) VALUES (?, ?, ?, ?, ?)")
+        .bind(id, title || null, content, room_slug || null, createdAt)
         .run();
 
       return json({ id });
     }
 
-    if (url.pathname === "/api/notes" && request.method === "GET") {
+   if (url.pathname === "/api/notes" && request.method === "GET") {
       if (!(await isAuthenticated(request, env))) {
         return json({ error: "Not authorized" }, 403);
       }
 
-      const { results } = await env.DB
-        .prepare("SELECT id, title, content, created_at FROM notes ORDER BY created_at DESC")
-        .all();
+      const roomSlug = url.searchParams.get("room_slug");
+
+      const { results } = roomSlug
+        ? await env.DB
+            .prepare("SELECT id, title, content, room_slug, created_at FROM notes WHERE room_slug = ? ORDER BY created_at DESC")
+            .bind(roomSlug)
+            .all()
+        : await env.DB
+            .prepare("SELECT id, title, content, room_slug, created_at FROM notes WHERE room_slug IS NULL ORDER BY created_at DESC")
+            .all();
 
       return json({ notes: results });
     }
-
     const noteMatch = url.pathname.match(/^\/api\/notes\/([^/]+)$/);
     if (noteMatch && request.method === "PATCH") {
       if (!(await isAuthenticated(request, env))) {

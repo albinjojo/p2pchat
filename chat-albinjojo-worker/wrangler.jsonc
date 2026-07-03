@@ -29,10 +29,10 @@
 			}
 		]
 	},
-	"migrations": [
+"migrations": [
 		{
 			"tag": "v1",
-			"new_classes": ["RoomSignal"]
+			"new_sqlite_classes": ["RoomSignal"]
 		}
 	]
 }
