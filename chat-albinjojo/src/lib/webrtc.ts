@@ -1,5 +1,6 @@
-const WORKER_URL = "http://127.0.0.1:8787"; // swap for the real domain once deployed
-const WS_URL = "ws://127.0.0.1:8787";
+const WORKER_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
+const WS_URL = WORKER_URL.replace(/^http/, "ws");
 
 export interface ChatConnection {
   peer: RTCPeerConnection;

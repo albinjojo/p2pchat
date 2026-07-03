@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 
-const WORKER_URL = "http://127.0.0.1:8787";
+const WORKER_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
 
 interface Note {
   id: string;
