@@ -4,6 +4,13 @@ import { useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
 
+interface Message {
+  id: string;
+  from: string;
+  text: string;
+  fading: boolean;
+}
+
 const WORKER_URL = "http://127.0.0.1:8787";
 
 type Stage = "gate" | "nickname" | "chat";
@@ -14,12 +21,28 @@ export default function RoomPage() {
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState("");
-  const [messages, setMessages] = useState<{ from: string; text: string }[]>([]);
+ const [messages, setMessages] = useState<Message[]>([]);
+  const [vanishOn, setVanishOn] = useState(true);
   const [input, setInput] = useState("");
   const connectionRef = useRef<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
-
   const connecting = useRef(false);
+
+  function addMessage(from: string, text: string) {
+    const id = crypto.randomUUID();
+    setMessages((prev) => [...prev, { id, from, text, fading: false }]);
+
+    if (vanishOn) {
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === id ? { ...m, fading: true } : m))
+        );
+        setTimeout(() => {
+          setMessages((prev) => prev.filter((m) => m.id !== id));
+        }, 1000);
+      }, 4000);
+    }
+  }
 
   async function handleVerify() {
     if (connecting.current) return;
@@ -34,6 +57,7 @@ export default function RoomPage() {
 
     if (!data.ok) {
       setError("Wrong answer, try again");
+      connecting.current = false;
       return;
     }
 
@@ -52,7 +76,7 @@ export default function RoomPage() {
     if (data.type === "nickname") {
       peerNickname.current = data.nickname;
     } else {
-      setMessages((prev) => [...prev, { from: peerNickname.current, text: data.text }]);
+      addMessage(peerNickname.current, data.text);
     }
   }
 
@@ -69,7 +93,7 @@ export default function RoomPage() {
   function send() {
     if (!input.trim() || !connectionRef.current) return;
     sendMessage(connectionRef.current, JSON.stringify({ type: "text", text: input }));
-    setMessages((prev) => [...prev, { from: "me", text: input }]);
+    addMessage("me", input);
     setInput("");
   }
 
@@ -104,9 +128,22 @@ export default function RoomPage() {
 
   return (
     <main style={{ maxWidth: 500, margin: "2rem auto" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
+        <button onClick={() => setVanishOn((v) => !v)}>
+          Vanish mode: {vanishOn ? "ON" : "OFF"}
+        </button>
+        <button onClick={() => setMessages([])}>Clear</button>
+      </div>
       <div style={{ minHeight: 300 }}>
-        {messages.map((m, i) => (
-          <div key={i}>
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            style={{
+              opacity: m.fading ? 0 : 1,
+              filter: m.fading ? "blur(3px)" : "none",
+              transition: "opacity 1s ease, filter 1s ease",
+            }}
+          >
             <b>{m.from}:</b> {m.text}
           </div>
         ))}
