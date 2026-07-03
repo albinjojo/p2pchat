@@ -1,15 +1,17 @@
-/*CREATE TABLE IF NOT EXISTS rooms (
+CREATE TABLE IF NOT EXISTS rooms (
   slug TEXT PRIMARY KEY,
   question TEXT NOT NULL,
   answer_hash TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  name TEXT DEFAULT 'Untitled'
 );
 
 CREATE TABLE IF NOT EXISTS notes (
   id TEXT PRIMARY KEY,
   title TEXT,
   content TEXT NOT NULL,
-  created_at INTEGER NOT NULL
+  created_at INTEGER NOT NULL,
+  room_slug TEXT
 );
 
 CREATE TABLE IF NOT EXISTS admin (
@@ -21,12 +23,4 @@ CREATE TABLE IF NOT EXISTS sessions (
   token TEXT PRIMARY KEY,
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
-);*/
-
-CREATE TABLE IF NOT EXISTS rooms (
-  slug TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  question TEXT NOT NULL,
-  answer_hash TEXT NOT NULL,
-  created_at INTEGER NOT NULL
 );
