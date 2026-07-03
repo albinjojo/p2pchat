@@ -136,6 +136,16 @@ export default {
     }
 
     const deleteMatch = url.pathname.match(/^\/api\/rooms\/([^/]+)$/);
+    if (deleteMatch && request.method === "GET") {
+      const slug = deleteMatch[1];
+      const room = await env.DB
+        .prepare("SELECT slug, question, created_at FROM rooms WHERE slug = ?")
+        .bind(slug)
+        .first();
+
+      if (!room) return json({ error: "Room not found" }, 404);
+      return json(room);
+    }
     if (deleteMatch && request.method === "DELETE") {
       if (!(await isAuthenticated(request, env))) {
         return json({ error: "Not authorized" }, 403);

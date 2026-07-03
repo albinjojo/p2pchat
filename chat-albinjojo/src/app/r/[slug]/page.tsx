@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
 
@@ -18,15 +18,22 @@ type Stage = "gate" | "nickname" | "chat";
 export default function RoomPage() {
   const { slug } = useParams<{ slug: string }>();
   const [stage, setStage] = useState<Stage>("gate");
+  const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState("");
- const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [vanishOn, setVanishOn] = useState(true);
   const [input, setInput] = useState("");
   const connectionRef = useRef<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
   const connecting = useRef(false);
+
+  useEffect(() => {
+    fetch(`${WORKER_URL}/api/rooms/${slug}`)
+      .then((res) => res.json())
+      .then((data) => setQuestion(data.question || ""));
+  }, [slug]);
 
   function addMessage(from: string, text: string) {
     const id = crypto.randomUUID();
@@ -100,7 +107,7 @@ export default function RoomPage() {
   if (stage === "gate") {
     return (
       <main style={{ maxWidth: 400, margin: "4rem auto", textAlign: "center" }}>
-        <p>Answer to enter this room:</p>
+        <p>{question || "Loading..."}</p>
         <input
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}

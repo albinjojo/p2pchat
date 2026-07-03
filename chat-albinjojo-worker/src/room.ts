@@ -4,13 +4,22 @@ interface Session {
 
 export class RoomSignal {
   sessions: Session[] = [];
+  maxSessions: number = 2;
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("Expected WebSocket", { status: 426 });
     }
 
-    if (this.sessions.length >= 2) {
+    const url = new URL(request.url);
+    const role = url.searchParams.get("role");
+    const maxParam = url.searchParams.get("max");
+
+    if (role === "owner" && maxParam) {
+      this.maxSessions = parseInt(maxParam, 10) || 2;
+    }
+
+    if (this.sessions.length >= this.maxSessions) {
       return new Response("Room full", { status: 409 });
     }
 
@@ -21,9 +30,10 @@ export class RoomSignal {
     const session: Session = { ws: server };
     this.sessions.push(session);
 
-    server.addEventListener("message", (event) => {
-      const other = this.sessions.find((s) => s !== session);
-      if (other) other.ws.send(event.data as string);
+   server.addEventListener("message", (event) => {
+      for (const other of this.sessions) {
+        if (other !== session) other.ws.send(event.data as string);
+      }
     });
 
    server.addEventListener("close", () => {
