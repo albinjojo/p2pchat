@@ -8,6 +8,8 @@ export interface ChatConnection {
   close: () => void;
 }
 
+const pendingQueues = new WeakMap<ChatConnection, string[]>();
+
 export async function connectToRoom(
   slug: string,
   role: "owner" | "guest",
@@ -25,11 +27,25 @@ export async function connectToRoom(
     iceServers: [{ urls: "stun:stun.cloudflare.com:3478" }],
   });
 
+  const queue: string[] = [];
   let channel: RTCDataChannel;
+
+  function flushQueue() {
+    if (channel?.readyState === "open") {
+      for (const text of queue.splice(0)) {
+        channel.send(text);
+      }
+    }
+  }
+
+  function handleChannelOpen() {
+    onOpen();
+    flushQueue();
+  }
 
   if (role === "owner") {
     channel = peer.createDataChannel("chat");
-    setupChannel(channel, onMessage, onOpen);
+    setupChannel(channel, onMessage, handleChannelOpen);
   }
 
   peer.onicecandidate = (event) => {
@@ -40,7 +56,7 @@ export async function connectToRoom(
 
   peer.ondatachannel = (event) => {
     channel = event.channel;
-    setupChannel(channel, onMessage, onOpen);
+    setupChannel(channel, onMessage, handleChannelOpen);
   };
 
   ws.onmessage = async (event) => {
@@ -74,7 +90,7 @@ export async function connectToRoom(
     }
   };
 
-  return {
+  const connection: ChatConnection = {
     peer,
     get channel() {
       return channel;
@@ -85,6 +101,9 @@ export async function connectToRoom(
       ws.close();
     },
   } as ChatConnection;
+
+  pendingQueues.set(connection, queue);
+  return connection;
 }
 
 function setupChannel(
@@ -99,5 +118,7 @@ function setupChannel(
 export function sendMessage(connection: ChatConnection, text: string) {
   if (connection.channel?.readyState === "open") {
     connection.channel.send(text);
+  } else {
+    pendingQueues.get(connection)?.push(text);
   }
 }

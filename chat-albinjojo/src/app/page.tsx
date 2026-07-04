@@ -52,6 +52,7 @@ export default function Lobby() {
   const [input, setInput] = useState("");
   const [connection, setConnection] = useState<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
+  const [myNickname, setMyNickname] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("session_token");
@@ -235,6 +236,11 @@ export default function Lobby() {
     setInput("");
   }
 
+  function sendNickname() {
+    if (!myNickname.trim() || !connection) return;
+    sendMessage(connection, JSON.stringify({ type: "nickname", nickname: myNickname }));
+  }
+
   return (
     <main className="max-w-xl mx-auto py-16 px-6" style={token ? { maxWidth: 900 } : undefined}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
@@ -366,6 +372,15 @@ export default function Lobby() {
             <h3>Chat</h3>
             {activeSlug ? (
               <>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+                  <input
+                    value={myNickname}
+                    onChange={(e) => setMyNickname(e.target.value)}
+                    placeholder="Your nickname"
+                    style={{ flex: 1 }}
+                  />
+                  <button onClick={sendNickname}>Set nickname</button>
+                </div>
                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
                   <button onClick={() => setVanishOn((v) => !v)}>
                     Vanish mode: {vanishOn ? "ON" : "OFF"}
