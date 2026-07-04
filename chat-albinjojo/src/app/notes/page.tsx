@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 
 const WORKER_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
+
+const PASTELS = ["bg-yellow", "bg-green-light", "bg-lavender"];
 
 interface Note {
   id: string;
@@ -107,59 +110,98 @@ export default function NotesPage() {
 
   if (!token) {
     return (
-      <main style={{ maxWidth: 300, margin: "4rem auto" }}>
-        <h2>Notes Login</h2>
-        <input
-          placeholder="Username"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <input
-          placeholder="Password"
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-        />
-        <button onClick={handleLogin}>Log in</button>
-        {loginError && <p style={{ color: "red" }}>{loginError}</p>}
+      <main className="mx-auto flex min-h-screen w-full max-w-xs flex-col justify-center px-6">
+        <div className="hard-panel p-6">
+          <p className="section-label mb-4 justify-center" style={{ "--label-accent": "var(--yellow)" } as React.CSSProperties}>
+            01. NOTES ACCESS
+          </p>
+          <input
+            className="hard-input mb-3"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
+          <input
+            className="hard-input mb-3"
+            placeholder="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+          />
+          <button className="hard-btn hard-btn-primary w-full justify-center" onClick={handleLogin}>
+            Log in
+          </button>
+          {loginError && <p className="mt-3 font-mono text-[10px] text-red">{loginError}</p>}
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={{ maxWidth: 600, margin: "2rem auto" }}>
-      <h1>Notes</h1>
+    <main className="mx-auto w-full max-w-2xl px-6 py-16">
+      <h1 className="font-display mb-2 text-2xl font-bold">Notes</h1>
+      <p className="section-label mb-8" style={{ "--label-accent": "var(--lavender)" } as React.CSSProperties}>
+        02. SCRATCHPAD
+      </p>
 
-      <div style={{ marginBottom: "2rem", border: "1px solid #333", padding: "1rem" }}>
+      <div className="hard-panel mb-8 p-5">
+        <label className="input-label">Title (optional)</label>
         <input
-          placeholder="Title (optional)"
+          className="hard-input mb-3"
+          placeholder="Title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          style={{ display: "block", width: "100%", marginBottom: "0.5rem" }}
         />
+        <label className="input-label">Content</label>
         <textarea
+          className="hard-input mb-3"
           placeholder="Write or paste anything..."
           value={content}
           onChange={(e) => setContent(e.target.value)}
           rows={5}
-          style={{ display: "block", width: "100%", marginBottom: "0.5rem" }}
         />
-        <button onClick={saveNote}>{editingId ? "Update" : "Save"}</button>
-        {editingId && <button onClick={resetForm}>Cancel</button>}
+        <div className="flex gap-2">
+          <button className="hard-btn hard-btn-primary flex-1 justify-center" onClick={saveNote}>
+            {editingId ? "Update" : "Save"}
+          </button>
+          {editingId && (
+            <button className="hard-btn" onClick={resetForm}>
+              Cancel
+            </button>
+          )}
+        </div>
       </div>
 
       {notes.length === 0 ? (
-        <p style={{ color: "#888" }}>No notes yet.</p>
+        <p className="font-mono text-xs text-ink-faint">No notes yet.</p>
       ) : (
-        notes.map((n) => (
-          <div key={n.id} style={{ border: "1px solid #333", padding: "1rem", marginBottom: "0.75rem" }}>
-            {n.title && <h4>{n.title}</h4>}
-            <p style={{ whiteSpace: "pre-wrap" }}>{n.content}</p>
-            <button onClick={() => startEdit(n)}>Edit</button>
-            <button onClick={() => deleteNote(n.id)}>Delete</button>
-          </div>
-        ))
+        <div className="flex flex-col gap-3">
+          {notes.map((n, i) => (
+            <motion.div
+              key={n.id}
+              layout
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25 }}
+              className={`hard-panel p-5 ${PASTELS[i % PASTELS.length]}`}
+            >
+              <div className="mb-2 flex items-center justify-between">
+                <span className="tag-badge">NOTE-{String(i + 1).padStart(2, "0")}</span>
+              </div>
+              {n.title && <h4 className="font-display mb-1 font-semibold">{n.title}</h4>}
+              <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink-muted">{n.content}</p>
+              <div className="mt-3 flex gap-2">
+                <button className="hard-btn" onClick={() => startEdit(n)}>
+                  Edit
+                </button>
+                <button className="hard-btn" onClick={() => deleteNote(n.id)}>
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </div>
       )}
     </main>
   );

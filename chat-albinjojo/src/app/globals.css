@@ -1,26 +1,204 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --bg: #f5f1e8;
+  --bg-alt: #ece5d4;
+  --ink: #111111;
+  --ink-muted: #5c5c5c;
+  --ink-faint: #949494;
+  --border-strong: #1113;
+  --orange: #f97316;
+  --orange-light: #fef0e2;
+  --yellow: #fff3b8;
+  --green: #a8e063;
+  --green-light: #c9e8a8;
+  --lavender: #d4c5f9;
+  --red: #b85c4b;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+@theme {
+  --color-bg: var(--bg);
+  --color-bg-alt: var(--bg-alt);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-border-strong: var(--border-strong);
+  --color-orange: var(--orange);
+  --color-orange-light: var(--orange-light);
+  --color-yellow: var(--yellow);
+  --color-green: var(--green);
+  --color-green-light: var(--green-light);
+  --color-lavender: var(--lavender);
+  --color-red: var(--red);
+  --font-display: var(--font-display-raw), "Syne", system-ui, sans-serif;
+  --font-sans: var(--font-sans-raw), "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-mono: var(--font-mono-raw), ui-monospace, "JetBrains Mono", monospace;
+  --font-accent: var(--font-accent-raw), "Instrument Serif", Georgia, serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  background-image: radial-gradient(circle, #1111110f 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.accent-word {
+  font-family: var(--font-accent);
+  font-style: italic;
+  font-weight: 400;
+}
+
+@layer components {
+  .section-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+  }
+
+  .section-label::before {
+    content: "";
+    display: block;
+    width: 24px;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--label-accent, var(--border-strong));
+  }
+
+  .hard-panel {
+    background: #fff;
+    border: 2.5px solid var(--ink);
+    border-radius: 0.75rem;
+    box-shadow: 4px 4px 0 0 var(--ink);
+  }
+
+  .tag-badge {
+    display: inline-flex;
+    align-items: center;
+    border: 1.5px solid var(--ink);
+    border-radius: 999px;
+    background: var(--green-light);
+    padding: 0.15rem 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink);
+    box-shadow: 1.5px 1.5px 0 0 var(--ink);
+  }
+
+  .hard-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border: 2px solid var(--ink);
+    border-radius: 0.5rem;
+    background: #fff;
+    color: var(--ink);
+    padding: 0.5rem 0.75rem;
+    box-shadow: 2.5px 2.5px 0 0 var(--ink);
+    transition: transform 0.1s ease, box-shadow 0.1s ease;
+    cursor: pointer;
+  }
+
+  .hard-btn-primary {
+    background: var(--orange);
+    color: var(--ink);
+  }
+
+  .hard-btn:hover {
+    transform: translate(1px, 1px);
+    box-shadow: 1.5px 1.5px 0 0 var(--ink);
+  }
+
+  .hard-btn:active {
+    transform: translate(2.5px, 2.5px);
+    box-shadow: 0 0 0 0 var(--ink);
+  }
+
+  .hard-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .hard-input {
+    display: block;
+    width: 100%;
+    background: var(--bg-alt);
+    border: 2px solid var(--ink);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    color: var(--ink);
+  }
+
+  .hard-input::placeholder {
+    color: var(--ink-faint);
+  }
+
+  .hard-input:focus {
+    outline: none;
+    background: #fff;
+  }
+
+  .mini-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3rem;
+    border: 2px solid var(--ink);
+    border-radius: 0.5rem;
+    padding: 16px;
+    margin-bottom: 8px;
+    box-shadow: 2px 2px 0 0 var(--ink);
+  }
+
+  .mini-card:last-child {
+    margin-bottom: 0;
+  }
+
+  .chip-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.1s ease, color 0.1s ease;
+  }
+
+  .chip-btn:hover {
+    background: var(--red);
+    color: #fff;
+  }
+
+  .input-label {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.25rem;
+  }
 }

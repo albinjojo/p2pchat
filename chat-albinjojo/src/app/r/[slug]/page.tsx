@@ -2,19 +2,21 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
-
-interface Message {
-  id: string;
-  from: string;
-  text: string;
-  fading: boolean;
-}
+import { useVanishMessages } from "@/lib/useVanishMessages";
+import { ChatThread } from "@/components/ChatThread";
 
 const WORKER_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
 
 type Stage = "gate" | "nickname" | "chat";
+
+const stageVariants = {
+  initial: { opacity: 0, y: 12 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -12 },
+};
 
 export default function RoomPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -23,10 +25,7 @@ export default function RoomPage() {
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState("");
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [vanishOn, setVanishOn] = useState(false);
-  const vanishOnRef = useRef(vanishOn);
-  vanishOnRef.current = vanishOn;
+  const { messages, addMessage, clear, vanishOn, setVanishOn } = useVanishMessages();
   const [input, setInput] = useState("");
   const connectionRef = useRef<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
@@ -37,22 +36,6 @@ export default function RoomPage() {
       .then((res) => res.json())
       .then((data) => setQuestion(data.question || ""));
   }, [slug]);
-
-  function addMessage(from: string, text: string) {
-    const id = crypto.randomUUID();
-    setMessages((prev) => [...prev, { id, from, text, fading: false }]);
-
-    if (vanishOnRef.current) {
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, fading: true } : m))
-        );
-        setTimeout(() => {
-          setMessages((prev) => prev.filter((m) => m.id !== id));
-        }, 1000);
-      }, 4000);
-    }
-  }
 
   async function handleVerify() {
     if (connecting.current) return;
@@ -86,7 +69,7 @@ export default function RoomPage() {
     if (data.type === "nickname") {
       peerNickname.current = data.nickname;
     } else {
-      addMessage(peerNickname.current, data.text);
+      addMessage(peerNickname.current, data.text, false);
     }
   }
 
@@ -103,68 +86,111 @@ export default function RoomPage() {
   function send() {
     if (!input.trim() || !connectionRef.current) return;
     sendMessage(connectionRef.current, JSON.stringify({ type: "text", text: input }));
-    addMessage("me", input);
+    addMessage("me", input, true);
     setInput("");
   }
 
-  if (stage === "gate") {
-    return (
-      <main style={{ maxWidth: 400, margin: "4rem auto", textAlign: "center" }}>
-        <p>{question || "Loading..."}</p>
-        <input
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Your answer"
-        />
-        <button onClick={handleVerify}>Unlock</button>
-        {error && <p style={{ color: "red" }}>{error}</p>}
-      </main>
-    );
-  }
-
-  if (stage === "nickname") {
-    return (
-      <main style={{ maxWidth: 400, margin: "4rem auto", textAlign: "center" }}>
-        <p>What should I call you?</p>
-        <input
-          value={nickname}
-          onChange={(e) => setNickname(e.target.value)}
-          placeholder="Nickname"
-        />
-        <button onClick={submitNickname}>Continue</button>
-      </main>
-    );
-  }
-
   return (
-    <main style={{ maxWidth: 500, margin: "2rem auto" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-        <button onClick={() => setVanishOn((v) => !v)}>
-          Vanish mode: {vanishOn ? "ON" : "OFF"}
-        </button>
-        <button onClick={() => setMessages([])}>Clear</button>
-      </div>
-      <div style={{ minHeight: 300 }}>
-        {messages.map((m) => (
-          <div
-            key={m.id}
-            style={{
-              opacity: m.fading ? 0 : 1,
-              filter: m.fading ? "blur(3px)" : "none",
-              transition: "opacity 1s ease, filter 1s ease",
-            }}
+    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">
+      <AnimatePresence mode="wait">
+        {stage === "gate" && (
+          <motion.div
+            key="gate"
+            variants={stageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3 }}
+            className="hard-panel p-6 text-center"
           >
-            <b>{m.from}:</b> {m.text}
-          </div>
-        ))}
-      </div>
-      <input
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-        onKeyDown={(e) => e.key === "Enter" && send()}
-        placeholder="Type a message"
-      />
-      <button onClick={send}>Send</button>
+            <p className="section-label mb-4 justify-center" style={{ "--label-accent": "var(--yellow)" } as React.CSSProperties}>
+              01. ACCESS
+            </p>
+            <p className="font-display mb-5 text-lg font-semibold">
+              {question || "Loading..."}
+            </p>
+            <input
+              className="hard-input mb-3"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleVerify()}
+              placeholder="Your answer"
+            />
+            <button className="hard-btn hard-btn-primary w-full justify-center" onClick={handleVerify}>
+              Unlock
+            </button>
+            {error && <p className="mt-3 font-mono text-[10px] text-red">{error}</p>}
+          </motion.div>
+        )}
+
+        {stage === "nickname" && (
+          <motion.div
+            key="nickname"
+            variants={stageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3 }}
+            className="hard-panel p-6 text-center"
+          >
+            <p className="section-label mb-4 justify-center" style={{ "--label-accent": "var(--lavender)" } as React.CSSProperties}>
+              02. IDENTIFY
+            </p>
+            <p className="font-display mb-5 text-lg font-semibold">
+              What should I call <span className="accent-word">you</span>?
+            </p>
+            <input
+              className="hard-input mb-3"
+              value={nickname}
+              onChange={(e) => setNickname(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitNickname()}
+              placeholder="Nickname"
+            />
+            <button className="hard-btn hard-btn-primary w-full justify-center" onClick={submitNickname}>
+              Continue
+            </button>
+          </motion.div>
+        )}
+
+        {stage === "chat" && (
+          <motion.div
+            key="chat"
+            variants={stageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={{ duration: 0.3 }}
+            className="hard-panel flex h-[640px] flex-col p-6"
+          >
+            <p className="section-label mb-4" style={{ "--label-accent": "var(--orange)" } as React.CSSProperties}>
+              03. LIVE CHAT
+            </p>
+            <div className="mb-4 flex justify-between">
+              <button className="hard-btn" onClick={() => setVanishOn((v) => !v)}>
+                Vanish mode: {vanishOn ? "ON" : "OFF"}
+              </button>
+              <button className="hard-btn" onClick={clear}>
+                Clear
+              </button>
+            </div>
+            <div className="mb-4 min-h-0 flex-1 overflow-y-auto">
+              <ChatThread messages={messages} />
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="hard-input flex-1"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && send()}
+                placeholder="Type a message"
+              />
+              <button className="hard-btn hard-btn-primary" onClick={send}>
+                Send
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

@@ -2,23 +2,24 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trash2 } from "lucide-react";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
+import { useVanishMessages } from "@/lib/useVanishMessages";
+import { ChatThread } from "@/components/ChatThread";
 
 const WORKER_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
+
+const PASTEL_YELLOW = "bg-yellow";
+const PASTEL_GREEN = "bg-green-light";
+const PASTEL_LAVENDER = "bg-lavender";
 
 interface Room {
   slug: string;
   name: string;
   question: string;
   created_at: number;
-}
-
-interface Message {
-  id: string;
-  from: string;
-  text: string;
-  fading: boolean;
 }
 
 interface Note {
@@ -38,20 +39,21 @@ export default function Lobby() {
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
   const [newMaxGuests, setNewMaxGuests] = useState(1);
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const [notes, setNotes] = useState<Note[]>([]);
-  const [noteTitle, setNoteTitle] = useState("");
-  const [noteContent, setNoteContent] = useState("");
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [showCreateNoteForm, setShowCreateNoteForm] = useState(false);
+  const [newNoteTitle, setNewNoteTitle] = useState("");
+  const [newNoteContent, setNewNoteContent] = useState("");
+  const [viewingNoteId, setViewingNoteId] = useState<string | null>(null);
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [editNoteTitle, setEditNoteTitle] = useState("");
+  const [editNoteContent, setEditNoteContent] = useState("");
 
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [vanishOn, setVanishOn] = useState(false);
-  const vanishOnRef = useRef(vanishOn);
-  vanishOnRef.current = vanishOn;
+  const { messages, addMessage, clear, vanishOn, setVanishOn } = useVanishMessages();
   const [input, setInput] = useState("");
   const [connection, setConnection] = useState<ChatConnection | null>(null);
-  const peerNickname = useRef<string>("them");
   const [myNickname, setMyNickname] = useState("");
 
   useEffect(() => {
@@ -81,22 +83,6 @@ export default function Lobby() {
       .then((data) => setNotes(data.notes || []));
   }
 
-  function addMessage(from: string, text: string) {
-    const id = crypto.randomUUID();
-    setMessages((prev) => [...prev, { id, from, text, fading: false }]);
-
-    if (vanishOnRef.current) {
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, fading: true } : m))
-        );
-        setTimeout(() => {
-          setMessages((prev) => prev.filter((m) => m.id !== id));
-        }, 1000);
-      }, 4000);
-    }
-  }
-
   async function handleLogin() {
     setLoginError("");
     const res = await fetch(`${WORKER_URL}/api/login`, {
@@ -122,7 +108,7 @@ export default function Lobby() {
     localStorage.removeItem("session_token");
     setToken(null);
     setActiveSlug(null);
-    setMessages([]);
+    clear();
     connection?.close();
     setConnection(null);
   }
@@ -144,6 +130,7 @@ export default function Lobby() {
       setNewName("");
       setNewQuestion("");
       setNewAnswer("");
+      setShowCreateForm(false);
       fetchRooms();
     }
   }
@@ -157,45 +144,48 @@ export default function Lobby() {
     if (activeSlug === slug) setActiveSlug(null);
   }
 
-  async function saveNote() {
-    if (!noteContent.trim()) return;
+  async function createNote() {
+    if (!newNoteContent.trim()) return;
 
-    if (editingNoteId) {
-      await fetch(`${WORKER_URL}/api/notes/${editingNoteId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Session-Token": token!,
-        },
-        body: JSON.stringify({ title: noteTitle, content: noteContent }),
-      });
-    } else {
-      await fetch(`${WORKER_URL}/api/notes`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Session-Token": token!,
-        },
-        body: JSON.stringify({ title: noteTitle, content: noteContent }),
-      });
-    }
+    await fetch(`${WORKER_URL}/api/notes`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-Token": token!,
+      },
+      body: JSON.stringify({ title: newNoteTitle, content: newNoteContent }),
+    });
 
-    setNoteTitle("");
-    setNoteContent("");
-    setEditingNoteId(null);
+    setNewNoteTitle("");
+    setNewNoteContent("");
+    setShowCreateNoteForm(false);
     fetchNotes();
   }
 
   function startEditNote(note: Note) {
-    setEditingNoteId(note.id);
-    setNoteTitle(note.title || "");
-    setNoteContent(note.content);
+    setEditNoteTitle(note.title || "");
+    setEditNoteContent(note.content);
+    setIsEditingNote(true);
   }
 
   function cancelEditNote() {
-    setEditingNoteId(null);
-    setNoteTitle("");
-    setNoteContent("");
+    setIsEditingNote(false);
+  }
+
+  async function saveEditedNote() {
+    if (!viewingNoteId || !editNoteContent.trim()) return;
+
+    await fetch(`${WORKER_URL}/api/notes/${viewingNoteId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Session-Token": token!,
+      },
+      body: JSON.stringify({ title: editNoteTitle, content: editNoteContent }),
+    });
+
+    setIsEditingNote(false);
+    fetchNotes();
   }
 
   async function deleteNote(id: string) {
@@ -203,14 +193,20 @@ export default function Lobby() {
       method: "DELETE",
       headers: { "X-Session-Token": token! },
     });
-    if (editingNoteId === id) cancelEditNote();
+    if (viewingNoteId === id) {
+      setViewingNoteId(null);
+      setIsEditingNote(false);
+    }
     fetchNotes();
   }
+
+  const peerNickname = useRef("them");
 
   async function openRoom(slug: string) {
     connection?.close();
     setActiveSlug(slug);
-    setMessages([]);
+    clear();
+    peerNickname.current = "them";
     const conn = await connectToRoom(
       slug,
       "owner",
@@ -220,7 +216,7 @@ export default function Lobby() {
         if (data.type === "nickname") {
           peerNickname.current = data.nickname;
         } else if (data.type === "text") {
-          addMessage(peerNickname.current, data.text);
+          addMessage(peerNickname.current, data.text, false);
         }
       },
       () => {},
@@ -232,7 +228,7 @@ export default function Lobby() {
   function send() {
     if (!input.trim() || !connection) return;
     sendMessage(connection, JSON.stringify({ type: "text", text: input }));
-    addMessage("me", input);
+    addMessage("me", input, true);
     setInput("");
   }
 
@@ -241,177 +237,354 @@ export default function Lobby() {
     sendMessage(connection, JSON.stringify({ type: "nickname", nickname: myNickname }));
   }
 
+  const viewingNote = notes.find((n) => n.id === viewingNoteId) ?? null;
+
   return (
-    <main className="max-w-xl mx-auto py-16 px-6" style={token ? { maxWidth: 900 } : undefined}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "2rem" }}>
-        <h1 className="text-2xl font-mono">chat.albinjojo.me</h1>
+    <main className={`mx-auto w-full px-6 py-16 ${token ? "max-w-5xl" : "max-w-xl"}`}>
+      <div className="mb-10 flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-2xl font-bold">
+            chat.<span className="accent-word">albinjojo</span>.me
+          </h1>
+          <p className="section-label mt-2">SYSTEM // P2P SIGNAL</p>
+        </div>
 
         {token ? (
-          <button onClick={handleLogout}>Log out</button>
+          <button className="hard-btn" onClick={handleLogout}>
+            Log out
+          </button>
         ) : (
-          <div style={{ position: "relative" }}>
-            <button onClick={() => setShowLoginBox((v) => !v)}>Login</button>
-            {showLoginBox && (
-              <div
-                style={{
-                  position: "absolute",
-                  right: 0,
-                  top: "2.5rem",
-                  border: "1px solid #444",
-                  padding: "1rem",
-                  background: "#111",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                  width: 200,
-                  zIndex: 10,
-                }}
-              >
-                <input
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-                <input
-                  placeholder="Password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                />
-                <button onClick={handleLogin}>Log in</button>
-                {loginError && <p style={{ color: "red", fontSize: "0.8rem" }}>{loginError}</p>}
-              </div>
-            )}
+          <div className="relative">
+            <button className="hard-btn" onClick={() => setShowLoginBox((v) => !v)}>
+              Login
+            </button>
+            <AnimatePresence>
+              {showLoginBox && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.15 }}
+                  className="hard-panel absolute right-0 top-12 z-10 flex w-56 flex-col gap-2 p-4"
+                >
+                  <input
+                    className="hard-input"
+                    placeholder="Username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                  />
+                  <input
+                    className="hard-input"
+                    placeholder="Password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                  />
+                  <button className="hard-btn hard-btn-primary justify-center" onClick={handleLogin}>
+                    Log in
+                  </button>
+                  {loginError && (
+                    <p className="font-mono text-[10px] text-red">{loginError}</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
       </div>
 
       {!token ? (
-        rooms.length === 0 ? (
-          <p className="text-sm text-neutral-500">No rooms yet.</p>
-        ) : (
-          rooms.map((r) => (
-            <div key={r.slug} className="flex justify-between items-center border p-4 rounded mb-3">
-              <Link href={`/r/${r.slug}`}>{r.name}</Link>
+        <div>
+          <p className="section-label mb-4" style={{ "--label-accent": "var(--yellow)" } as React.CSSProperties}>
+            01. ROOMS
+          </p>
+          {rooms.length === 0 ? (
+            <p className="font-mono text-xs text-ink-faint">No rooms yet.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {rooms.map((r, i) => {
+                const pastel = [PASTEL_YELLOW, PASTEL_GREEN, PASTEL_LAVENDER][i % 3];
+                return (
+                  <Link key={r.slug} href={`/r/${r.slug}`}>
+                    <div
+                      className={`hard-panel flex items-center justify-between px-5 py-4 transition-transform hover:translate-x-[1px] hover:translate-y-[1px] ${pastel}`}
+                    >
+                      <span className="font-display font-semibold">{r.name}</span>
+                      <span className="tag-badge">RM-{String(i + 1).padStart(2, "0")}</span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
-          ))
-        )
+          )}
+        </div>
       ) : (
-        <div style={{ display: "flex", gap: "2rem" }}>
-          <div style={{ width: 220 }}>
-            <h3>Rooms</h3>
-            <input
-              placeholder="Room name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              style={{ display: "block", width: "100%", marginBottom: "0.3rem" }}
-            />
-            <input
-              placeholder="Question"
-              value={newQuestion}
-              onChange={(e) => setNewQuestion(e.target.value)}
-              style={{ display: "block", width: "100%", marginBottom: "0.3rem" }}
-            />
-            <input
-              placeholder="Answer"
-              value={newAnswer}
-              onChange={(e) => setNewAnswer(e.target.value)}
-              style={{ display: "block", width: "100%", marginBottom: "0.3rem" }}
-            />
-            <input
-              type="number"
-              min={1}
-              placeholder="Max guests"
-              value={newMaxGuests}
-              onChange={(e) => setNewMaxGuests(Number(e.target.value))}
-              style={{ display: "block", width: "100%", marginBottom: "0.3rem" }}
-            />
-            <button onClick={createRoom}>Create Room</button>
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
+          <div className="flex min-w-0 flex-col gap-8">
+            <div className="hard-panel p-5">
+              <p className="section-label mb-4" style={{ "--label-accent": "var(--yellow)" } as React.CSSProperties}>
+                02. ROOMS
+              </p>
 
-            {rooms.map((r) => (
-              <div key={r.slug} style={{ display: "flex", justifyContent: "space-between", marginTop: "0.5rem" }}>
-                <span
-                  onClick={() => openRoom(r.slug)}
-                  style={{ cursor: "pointer", fontWeight: activeSlug === r.slug ? "bold" : "normal" }}
-                >
-                  {r.name}
-                </span>
-                <button onClick={() => deleteRoom(r.slug)}>×</button>
+              <button
+                className="hard-btn w-full justify-center"
+                onClick={() => setShowCreateForm((v) => !v)}
+              >
+                {showCreateForm ? "− Cancel" : "+ Create Room"}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {showCreateForm && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div className="pt-3">
+                      <label className="input-label">Room name</label>
+                      <input
+                        className="hard-input mb-3"
+                        value={newName}
+                        onChange={(e) => setNewName(e.target.value)}
+                      />
+                      <label className="input-label">Question</label>
+                      <input
+                        className="hard-input mb-3"
+                        value={newQuestion}
+                        onChange={(e) => setNewQuestion(e.target.value)}
+                      />
+                      <label className="input-label">Answer</label>
+                      <input
+                        className="hard-input mb-3"
+                        value={newAnswer}
+                        onChange={(e) => setNewAnswer(e.target.value)}
+                      />
+                      <label className="input-label">Max guests</label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="hard-input mb-3"
+                        value={newMaxGuests}
+                        onChange={(e) => setNewMaxGuests(Number(e.target.value))}
+                      />
+                      <button
+                        className="hard-btn hard-btn-primary w-full justify-center"
+                        onClick={createRoom}
+                      >
+                        Create Room
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-4 flex max-h-[280px] flex-col overflow-y-auto overscroll-contain pr-1">
+                {rooms.map((r, i) => {
+                  const pastel = [PASTEL_YELLOW, PASTEL_GREEN, PASTEL_LAVENDER][i % 3];
+                  return (
+                    <div
+                      key={r.slug}
+                      className={`mini-card flex items-center justify-between ${pastel}`}
+                    >
+                      <span
+                        onClick={() => openRoom(r.slug)}
+                        className={`font-display min-w-0 flex-1 cursor-pointer truncate font-semibold ${
+                          activeSlug === r.slug ? "text-orange" : ""
+                        }`}
+                      >
+                        {r.name}
+                      </span>
+                      <button className="chip-btn" onClick={() => deleteRoom(r.slug)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
 
-            <h3 style={{ marginTop: "2rem" }}>Notes</h3>
-            <input
-              placeholder="Title"
-              value={noteTitle}
-              onChange={(e) => setNoteTitle(e.target.value)}
-              style={{ display: "block", width: "100%", marginBottom: "0.3rem" }}
-            />
-            <textarea
-              placeholder="Note..."
-              value={noteContent}
-              onChange={(e) => setNoteContent(e.target.value)}
-              rows={3}
-              style={{ display: "block", width: "100%", marginBottom: "0.3rem" }}
-            />
-            <button onClick={saveNote}>{editingNoteId ? "Update Note" : "Save Note"}</button>
-            {editingNoteId && <button onClick={cancelEditNote}>Cancel</button>}
+            <div className="hard-panel p-5">
+              <p className="section-label mb-4" style={{ "--label-accent": "var(--lavender)" } as React.CSSProperties}>
+                03. NOTES
+              </p>
 
-            {notes.map((n) => (
-              <div key={n.id} style={{ marginTop: "0.5rem", fontSize: "0.9rem", display: "flex", justifyContent: "space-between" }}>
-                <span onClick={() => startEditNote(n)} style={{ cursor: "pointer" }}>
-                  {n.title || "(untitled)"}
-                </span>
-                <button onClick={() => deleteNote(n.id)}>×</button>
+              <button
+                className="hard-btn w-full justify-center"
+                onClick={() => setShowCreateNoteForm((v) => !v)}
+              >
+                {showCreateNoteForm ? "− Cancel" : "+ Create Note"}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {showCreateNoteForm && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25, ease: "easeInOut" }}
+                    style={{ overflow: "hidden" }}
+                  >
+                    <div className="pt-3">
+                      <label className="input-label">Title</label>
+                      <input
+                        className="hard-input mb-3"
+                        value={newNoteTitle}
+                        onChange={(e) => setNewNoteTitle(e.target.value)}
+                      />
+                      <label className="input-label">Content</label>
+                      <textarea
+                        className="hard-input mb-3"
+                        value={newNoteContent}
+                        onChange={(e) => setNewNoteContent(e.target.value)}
+                        rows={3}
+                      />
+                      <button
+                        className="hard-btn hard-btn-primary w-full justify-center"
+                        onClick={createNote}
+                      >
+                        Create Note
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              <div className="mt-4 flex max-h-[280px] flex-col overflow-y-auto overscroll-contain pr-1">
+                {notes.map((n, i) => {
+                  const pastel = [PASTEL_GREEN, PASTEL_LAVENDER, PASTEL_YELLOW][i % 3];
+                  return (
+                    <div
+                      key={n.id}
+                      className={`mini-card flex items-center justify-between ${pastel}`}
+                    >
+                      <span
+                        onClick={() => {
+                          setViewingNoteId(viewingNoteId === n.id ? null : n.id);
+                          setIsEditingNote(false);
+                        }}
+                        className={`font-display min-w-0 flex-1 cursor-pointer truncate font-semibold ${
+                          viewingNoteId === n.id ? "text-orange" : ""
+                        }`}
+                      >
+                        {n.title || "(untitled)"}
+                      </span>
+                      <button className="chip-btn" onClick={() => deleteNote(n.id)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
+            </div>
           </div>
 
-          <div style={{ flex: 1 }}>
-            <h3>Chat</h3>
-            {activeSlug ? (
-              <>
-                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
-                  <input
-                    value={myNickname}
-                    onChange={(e) => setMyNickname(e.target.value)}
-                    placeholder="Your nickname"
-                    style={{ flex: 1 }}
-                  />
-                  <button onClick={sendNickname}>Set nickname</button>
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1rem" }}>
-                  <button onClick={() => setVanishOn((v) => !v)}>
-                    Vanish mode: {vanishOn ? "ON" : "OFF"}
-                  </button>
-                  <button onClick={() => setMessages([])}>Clear</button>
-                </div>
-                <div style={{ minHeight: 300 }}>
-                  {messages.map((m) => (
-                    <div
-                      key={m.id}
-                      style={{
-                        opacity: m.fading ? 0 : 1,
-                        filter: m.fading ? "blur(3px)" : "none",
-                        transition: "opacity 1s ease, filter 1s ease",
-                      }}
-                    >
-                      <b>{m.from}:</b> {m.text}
+          <div className="flex min-w-0 flex-col gap-8">
+            <div className="hard-panel flex h-[640px] flex-col p-6">
+              <p className="section-label mb-4" style={{ "--label-accent": "var(--orange)" } as React.CSSProperties}>
+                04. LIVE CHAT
+              </p>
+
+              {activeSlug ? (
+                <>
+                  <div className="mb-4 flex gap-2">
+                    <input
+                      className="hard-input flex-1"
+                      placeholder="Your nickname"
+                      value={myNickname}
+                      onChange={(e) => setMyNickname(e.target.value)}
+                    />
+                    <button className="hard-btn" onClick={sendNickname}>
+                      Set nickname
+                    </button>
+                  </div>
+                  <div className="mb-4 flex justify-between">
+                    <button className="hard-btn" onClick={() => setVanishOn((v) => !v)}>
+                      Vanish mode: {vanishOn ? "ON" : "OFF"}
+                    </button>
+                    <button className="hard-btn" onClick={clear}>
+                      Clear
+                    </button>
+                  </div>
+                  <div className="mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                    <ChatThread messages={messages} />
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      className="hard-input flex-1"
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && send()}
+                      placeholder="Type a message"
+                    />
+                    <button className="hard-btn hard-btn-primary" onClick={send}>
+                      Send
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="font-mono text-xs text-ink-faint">Select a room to start chatting</p>
+              )}
+            </div>
+
+            <div className="hard-panel p-5">
+              <p className="section-label mb-4" style={{ "--label-accent": "var(--lavender)" } as React.CSSProperties}>
+                05. NOTE VIEW
+              </p>
+              {viewingNote ? (
+                isEditingNote ? (
+                  <>
+                    <label className="input-label">Title</label>
+                    <input
+                      className="hard-input mb-3"
+                      value={editNoteTitle}
+                      onChange={(e) => setEditNoteTitle(e.target.value)}
+                    />
+                    <label className="input-label">Content</label>
+                    <textarea
+                      className="hard-input mb-3"
+                      value={editNoteContent}
+                      onChange={(e) => setEditNoteContent(e.target.value)}
+                      rows={8}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        className="hard-btn hard-btn-primary flex-1 justify-center"
+                        onClick={saveEditedNote}
+                      >
+                        Update
+                      </button>
+                      <button className="hard-btn" onClick={cancelEditNote}>
+                        Cancel
+                      </button>
                     </div>
-                  ))}
-                </div>
-                <input
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && send()}
-                  placeholder="Type a message"
-                />
-                <button onClick={send}>Send</button>
-              </>
-            ) : (
-              <p style={{ color: "#888" }}>Select a room to start chatting</p>
-            )}
+                  </>
+                ) : (
+                  <>
+                    <h4 className="font-display mb-2 font-semibold">
+                      {viewingNote.title || "(untitled)"}
+                    </h4>
+                    <div className="max-h-[240px] overflow-y-auto overscroll-contain pr-1">
+                      <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink-muted">
+                        {viewingNote.content}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button className="hard-btn" onClick={() => startEditNote(viewingNote)}>
+                        Edit
+                      </button>
+                      <button className="hard-btn" onClick={() => setViewingNoteId(null)}>
+                        Close
+                      </button>
+                    </div>
+                  </>
+                )
+              ) : (
+                <p className="font-mono text-xs text-ink-faint">Click a note to view it here</p>
+              )}
+            </div>
           </div>
         </div>
       )}

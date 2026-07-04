@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
+import { useVanishMessages } from "@/lib/useVanishMessages";
+import { ChatThread } from "@/components/ChatThread";
 
 const WORKER_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
@@ -11,13 +13,6 @@ interface Room {
   name: string;
   question: string;
   created_at: number;
-}
-
-interface Message {
-  id: string;
-  from: string;
-  text: string;
-  fading: boolean;
 }
 
 interface Note {
@@ -44,10 +39,7 @@ export default function AdminPage() {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
 
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [vanishOn, setVanishOn] = useState(false);
-  const vanishOnRef = useRef(vanishOn);
-  vanishOnRef.current = vanishOn;
+  const { messages, addMessage, clear, vanishOn, setVanishOn } = useVanishMessages();
   const [input, setInput] = useState("");
   const [connection, setConnection] = useState<ChatConnection | null>(null);
   const peerNickname = useRef<string>("them");
@@ -74,22 +66,6 @@ export default function AdminPage() {
     })
       .then((res) => res.json())
       .then((data) => setNotes(data.notes || []));
-  }
-
-  function addMessage(from: string, text: string) {
-    const id = crypto.randomUUID();
-    setMessages((prev) => [...prev, { id, from, text, fading: false }]);
-
-    if (vanishOnRef.current) {
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) => (m.id === id ? { ...m, fading: true } : m))
-        );
-        setTimeout(() => {
-          setMessages((prev) => prev.filter((m) => m.id !== id));
-        }, 1000);
-      }, 4000);
-    }
   }
 
   async function handleLogin() {
@@ -199,7 +175,7 @@ export default function AdminPage() {
 
   async function openRoom(slug: string) {
     setActiveSlug(slug);
-    setMessages([]);
+    clear();
     const conn = await connectToRoom(
       slug,
       "owner",
@@ -209,7 +185,7 @@ export default function AdminPage() {
         if (data.type === "nickname") {
           peerNickname.current = data.nickname;
         } else if (data.type === "text") {
-          addMessage(peerNickname.current, data.text);
+          addMessage(peerNickname.current, data.text, false);
         }
       },
       () => {},
@@ -221,7 +197,7 @@ export default function AdminPage() {
   function send() {
     if (!input.trim() || !connection) return;
     sendMessage(connection, JSON.stringify({ type: "text", text: input }));
-    addMessage("me", input);
+    addMessage("me", input, true);
     setInput("");
   }
 
@@ -329,21 +305,10 @@ export default function AdminPage() {
                 <button onClick={() => setVanishOn((v) => !v)}>
                   Vanish mode: {vanishOn ? "ON" : "OFF"}
                 </button>
-                <button onClick={() => setMessages([])}>Clear</button>
+                <button onClick={clear}>Clear</button>
               </div>
               <div style={{ minHeight: 300 }}>
-                {messages.map((m) => (
-                  <div
-                    key={m.id}
-                    style={{
-                      opacity: m.fading ? 0 : 1,
-                      filter: m.fading ? "blur(3px)" : "none",
-                      transition: "opacity 1s ease, filter 1s ease",
-                    }}
-                  >
-                    <b>{m.from}:</b> {m.text}
-                  </div>
-                ))}
+                <ChatThread messages={messages} />
               </div>
               <input
                 value={input}
