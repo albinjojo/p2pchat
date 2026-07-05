@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
 import { useVanishMessages } from "@/lib/useVanishMessages";
 import { ChatThread } from "@/components/ChatThread";
+import { OnboardingGuide } from "@/components/OnboardingGuide";
 
 const WORKER_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
@@ -241,6 +242,7 @@ export default function Lobby() {
 
   return (
     <main className={`mx-auto w-full px-6 py-16 ${token ? "max-w-5xl" : "max-w-xl"}`}>
+      <OnboardingGuide />
       <div className="mb-10 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">
