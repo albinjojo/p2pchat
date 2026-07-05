@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
 import { useVanishMessages } from "@/lib/useVanishMessages";
 import { ChatThread } from "@/components/ChatThread";
@@ -103,6 +104,26 @@ export default function RoomPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-16">
+      {stage === "chat" && (
+        <div className="relative z-10 mx-auto -mb-2 h-[110px] w-[110px]" aria-hidden>
+          <DotLottieReact
+            src="/room-header.lottie"
+            loop
+            autoplay
+            layout={{ fit: "cover", align: [0.5, 0] }}
+          />
+        </div>
+      )}
+      {(stage === "gate" || stage === "nickname") && (
+        <div className="relative z-10 mx-auto -mb-3 h-32 w-32" aria-hidden>
+          <DotLottieReact
+            src="/gate-footer.lottie"
+            loop
+            autoplay
+            layout={{ fit: "cover", align: [0.5, 1] }}
+          />
+        </div>
+      )}
       <AnimatePresence mode="wait">
         {stage === "gate" && (
           <motion.div
