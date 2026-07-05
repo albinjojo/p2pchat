@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Syne, Plus_Jakarta_Sans, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { Syne, Plus_Jakarta_Sans, Geist_Mono, Instrument_Serif, Anton } from "next/font/google";
 import "./globals.css";
 
 const syne = Syne({
@@ -25,6 +25,12 @@ const instrumentSerif = Instrument_Serif({
   style: ["italic"],
 });
 
+const anton = Anton({
+  variable: "--font-outline-raw",
+  subsets: ["latin"],
+  weight: ["400"],
+});
+
 export const metadata: Metadata = {
   title: "chat.albinjojo.me",
   description: "Ephemeral, gate-locked P2P chat rooms.",
@@ -42,7 +48,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${syne.variable} ${plusJakarta.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
+      className={`${syne.variable} ${plusJakarta.variable} ${geistMono.variable} ${instrumentSerif.variable} ${anton.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-bg text-ink font-sans">
         {children}

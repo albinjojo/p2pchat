@@ -16,6 +16,18 @@ const PASTEL_YELLOW = "bg-yellow";
 const PASTEL_GREEN = "bg-green-light";
 const PASTEL_LAVENDER = "bg-lavender";
 
+// One tilt range used everywhere a room/note card appears. Kept modest
+// because these cards can be quite wide (guest lobby), and rotation
+// displacement scales with width — a 3deg tilt on a 600px-wide card shifts
+// its corners ~15px vertically, enough to overlap a neighboring tilted card.
+const CARD_TILTS = [
+  "rotate-[-1.25deg]",
+  "rotate-[1.5deg]",
+  "rotate-[-1.5deg]",
+  "rotate-[1.25deg]",
+  "rotate-[-1deg]",
+];
+
 interface Room {
   slug: string;
   name: string;
@@ -241,9 +253,8 @@ export default function Lobby() {
   const viewingNote = notes.find((n) => n.id === viewingNoteId) ?? null;
 
   return (
-    <main className={`mx-auto w-full px-6 py-16 ${token ? "max-w-5xl" : "max-w-xl"}`}>
-      <OnboardingGuide />
-      <div className="mb-10 flex items-center justify-between">
+    <main className={`mx-auto w-full px-6 py-10 ${token ? "max-w-5xl" : "max-w-xl"}`}>
+      <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">
             chat.<span className="accent-word">albinjojo</span>.me
@@ -252,12 +263,12 @@ export default function Lobby() {
         </div>
 
         {token ? (
-          <button className="hard-btn" onClick={handleLogout}>
+          <button className="pill-btn" onClick={handleLogout}>
             Log out
           </button>
         ) : (
           <div className="relative">
-            <button className="hard-btn" onClick={() => setShowLoginBox((v) => !v)}>
+            <button className="pill-btn" onClick={() => setShowLoginBox((v) => !v)}>
               Login
             </button>
             <AnimatePresence>
@@ -298,28 +309,43 @@ export default function Lobby() {
 
       {!token ? (
         <div>
-          <p className="section-label mb-4" style={{ "--label-accent": "var(--yellow)" } as React.CSSProperties}>
+          <p className="section-label mb-2" style={{ "--label-accent": "var(--yellow)" } as React.CSSProperties}>
             01. ROOMS
           </p>
+          <h2 className="outline-heading mb-1 text-5xl">ROOMS</h2>
+          <svg width="72" height="14" viewBox="0 0 72 14" className="mb-3" aria-hidden>
+            <path
+              d="M2 7 Q 11 1, 20 7 T 38 7 T 56 7 T 74 7"
+              stroke="var(--ink)"
+              strokeWidth="2.5"
+              fill="none"
+              strokeLinecap="round"
+            />
+          </svg>
           {rooms.length === 0 ? (
             <p className="font-mono text-xs text-ink-faint">No rooms yet.</p>
           ) : (
-            <div className="flex flex-col gap-3">
-              {rooms.map((r, i) => {
-                const pastel = [PASTEL_YELLOW, PASTEL_GREEN, PASTEL_LAVENDER][i % 3];
-                return (
-                  <Link key={r.slug} href={`/r/${r.slug}`}>
-                    <div
-                      className={`hard-panel flex items-center justify-between px-5 py-4 transition-transform hover:translate-x-[1px] hover:translate-y-[1px] ${pastel}`}
-                    >
-                      <span className="font-display font-semibold">{r.name}</span>
-                      <span className="tag-badge">RM-{String(i + 1).padStart(2, "0")}</span>
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="scroll-thin max-h-[180px] overflow-y-auto overscroll-contain px-2 py-4">
+              <div className="flex flex-col gap-5">
+                {rooms.map((r, i) => {
+                  const pastel = [PASTEL_YELLOW, PASTEL_GREEN, PASTEL_LAVENDER][i % 3];
+                  const tilt = CARD_TILTS[i % CARD_TILTS.length];
+                  return (
+                    <Link key={r.slug} href={`/r/${r.slug}`}>
+                      <div
+                        className={`hard-panel flex items-center justify-between px-5 py-4 transition-transform hover:rotate-0 hover:translate-x-[1px] hover:translate-y-[1px] ${pastel} ${tilt}`}
+                      >
+                        <span className="font-display font-semibold">{r.name}</span>
+                        <span className="tag-badge">RM-{String(i + 1).padStart(2, "0")}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
             </div>
           )}
+
+          <OnboardingGuide />
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-[280px_1fr]">
@@ -383,13 +409,14 @@ export default function Lobby() {
                 )}
               </AnimatePresence>
 
-              <div className="mt-4 flex max-h-[280px] flex-col overflow-y-auto overscroll-contain pr-1">
+              <div className="scroll-thin mt-4 flex max-h-[280px] flex-col overflow-y-auto overscroll-contain pr-1">
                 {rooms.map((r, i) => {
                   const pastel = [PASTEL_YELLOW, PASTEL_GREEN, PASTEL_LAVENDER][i % 3];
+                  const tilt = CARD_TILTS[i % CARD_TILTS.length];
                   return (
                     <div
                       key={r.slug}
-                      className={`mini-card flex items-center justify-between ${pastel}`}
+                      className={`mini-card flex items-center justify-between transition-transform hover:rotate-0 ${pastel} ${tilt}`}
                     >
                       <span
                         onClick={() => openRoom(r.slug)}
@@ -454,13 +481,14 @@ export default function Lobby() {
                 )}
               </AnimatePresence>
 
-              <div className="mt-4 flex max-h-[280px] flex-col overflow-y-auto overscroll-contain pr-1">
+              <div className="scroll-thin mt-4 flex max-h-[280px] flex-col overflow-y-auto overscroll-contain pr-1">
                 {notes.map((n, i) => {
                   const pastel = [PASTEL_GREEN, PASTEL_LAVENDER, PASTEL_YELLOW][i % 3];
+                  const tilt = CARD_TILTS[i % CARD_TILTS.length];
                   return (
                     <div
                       key={n.id}
-                      className={`mini-card flex items-center justify-between ${pastel}`}
+                      className={`mini-card flex items-center justify-between transition-transform hover:rotate-0 ${pastel} ${tilt}`}
                     >
                       <span
                         onClick={() => {
@@ -510,7 +538,7 @@ export default function Lobby() {
                       Clear
                     </button>
                   </div>
-                  <div className="mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
+                  <div className="scroll-thin mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     <ChatThread messages={messages} />
                   </div>
                   <div className="flex gap-2">
@@ -568,7 +596,7 @@ export default function Lobby() {
                     <h4 className="font-display mb-2 font-semibold">
                       {viewingNote.title || "(untitled)"}
                     </h4>
-                    <div className="max-h-[240px] overflow-y-auto overscroll-contain pr-1">
+                    <div className="scroll-thin max-h-[240px] overflow-y-auto overscroll-contain pr-1">
                       <p className="min-w-0 whitespace-pre-wrap break-words text-sm text-ink-muted">
                         {viewingNote.content}
                       </p>
