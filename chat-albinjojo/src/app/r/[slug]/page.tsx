@@ -59,7 +59,10 @@ export default function RoomPage() {
       slug,
       data.access,
       handleIncoming,
-      () => setStage("chat")
+      () => {
+        // Data channel finishing its handshake shouldn't skip the mandatory
+        // nickname step — only submitNickname() may advance to "chat".
+      }
     );
     setStage("nickname");
   }

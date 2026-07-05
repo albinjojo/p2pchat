@@ -51,7 +51,6 @@ export default function Lobby() {
   const [newName, setNewName] = useState("");
   const [newQuestion, setNewQuestion] = useState("");
   const [newAnswer, setNewAnswer] = useState("");
-  const [newMaxGuests, setNewMaxGuests] = useState(1);
   const [showCreateForm, setShowCreateForm] = useState(false);
 
   const [notes, setNotes] = useState<Note[]>([]);
@@ -220,7 +219,6 @@ export default function Lobby() {
 
     const conn = await connectOwnerToRoom(
       slug,
-      newMaxGuests,
       (_guestId, nickname, text) => {
         addMessage(nickname || "them", text, false);
       },
@@ -385,14 +383,6 @@ export default function Lobby() {
                         className="hard-input mb-3"
                         value={newAnswer}
                         onChange={(e) => setNewAnswer(e.target.value)}
-                      />
-                      <label className="input-label">Max guests</label>
-                      <input
-                        type="number"
-                        min={1}
-                        className="hard-input mb-3"
-                        value={newMaxGuests}
-                        onChange={(e) => setNewMaxGuests(Number(e.target.value))}
                       />
                       <button
                         className="hard-btn hard-btn-primary w-full justify-center"

@@ -11,7 +11,6 @@ interface SignalMessage {
 
 export class RoomSignal {
   sessions: Session[] = [];
-  maxSessions: number = 2;
 
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
@@ -20,15 +19,6 @@ export class RoomSignal {
 
     const url = new URL(request.url);
     const role = url.searchParams.get("role") as "owner" | "guest" | null;
-    const maxParam = url.searchParams.get("max");
-
-    if (role === "owner" && maxParam) {
-      this.maxSessions = parseInt(maxParam, 10) || 2;
-    }
-
-    if (this.sessions.length >= this.maxSessions) {
-      return new Response("Room full", { status: 409 });
-    }
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];

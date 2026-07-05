@@ -21,12 +21,10 @@ export async function connectToRoom(
   slug: string,
   access: string | undefined,
   onMessage: (text: string) => void,
-  onOpen: () => void,
-  maxGuests?: number
+  onOpen: () => void
 ): Promise<ChatConnection> {
   const params = new URLSearchParams({ role: "guest" });
   if (access) params.set("access", access);
-  if (maxGuests) params.set("max", String(maxGuests + 1));
   const ws = new WebSocket(`${WS_URL}/api/rooms/${slug}/ws?${params}`);
 
   const peer = new RTCPeerConnection({
@@ -144,12 +142,10 @@ interface GuestPeer {
  */
 export async function connectOwnerToRoom(
   slug: string,
-  maxGuests: number | undefined,
   onGuestMessage: (guestId: string, nickname: string, text: string) => void,
   onGuestLeave: (guestId: string) => void
 ): Promise<OwnerConnection> {
   const params = new URLSearchParams({ role: "owner" });
-  if (maxGuests) params.set("max", String(maxGuests + 1));
   const ws = new WebSocket(`${WS_URL}/api/rooms/${slug}/ws?${params}`);
 
   const guestPeers = new Map<string, GuestPeer>();
