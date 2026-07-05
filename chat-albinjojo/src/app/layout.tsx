@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Syne, Plus_Jakarta_Sans, Geist_Mono, Instrument_Serif, Anton } from "next/font/google";
+import { SiteBackground } from "@/components/SiteBackground";
 import "./globals.css";
 
 const syne = Syne({
@@ -51,6 +52,7 @@ export default function RootLayout({
       className={`${syne.variable} ${plusJakarta.variable} ${geistMono.variable} ${instrumentSerif.variable} ${anton.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-bg text-ink font-sans">
+        <SiteBackground />
         {children}
       </body>
     </html>
