@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2 } from "lucide-react";
@@ -67,6 +67,18 @@ export default function Lobby() {
   const [input, setInput] = useState("");
   const [ownerConnection, setOwnerConnection] = useState<OwnerConnection | null>(null);
   const [myNickname, setMyNickname] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const prevMessageCount = useRef(0);
+
+  // Vanish mode removes expired messages from the same array new ones are
+  // appended to, so a plain length-changed check would also fire (and
+  // re-scroll) on every expiry. Only scroll when the count goes up.
+  useEffect(() => {
+    if (messages.length > prevMessageCount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+    prevMessageCount.current = messages.length;
+  }, [messages]);
 
   useEffect(() => {
     const saved = localStorage.getItem("session_token");
@@ -526,6 +538,7 @@ export default function Lobby() {
                   </div>
                   <div className="scroll-thin mb-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
                     <ChatThread messages={messages} />
+                    <div ref={messagesEndRef} />
                   </div>
                   <div className="flex gap-2">
                     <input
