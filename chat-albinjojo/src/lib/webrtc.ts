@@ -62,6 +62,19 @@ export async function connectToRoom(
   ws.onmessage = async (event) => {
     const msg = JSON.parse(event.data);
 
+    // Sent by the Durable Object once both parties are connected — either
+    // because we were already here and someone just joined, or because we
+    // just joined a room where someone was already waiting. Only the owner
+    // ever initiates the offer, and only now that a peer is confirmed
+    // present, so the offer never gets sent (and lost) into an empty room.
+    if (msg.type === "peer-joined") {
+      if (role === "owner" && peer.signalingState === "stable") {
+        const offer = await peer.createOffer();
+        await peer.setLocalDescription(offer);
+        ws.send(JSON.stringify({ type: "offer", offer }));
+      }
+    }
+
    if (msg.type === "offer") {
       if (peer.signalingState === "stable" || peer.signalingState === "have-remote-offer") {
         await peer.setRemoteDescription(msg.offer);
@@ -79,14 +92,6 @@ export async function connectToRoom(
 
     if (msg.type === "ice") {
       await peer.addIceCandidate(msg.candidate);
-    }
-  };
-
-  ws.onopen = async () => {
-    if (role === "owner") {
-      const offer = await peer.createOffer();
-      await peer.setLocalDescription(offer);
-      ws.send(JSON.stringify({ type: "offer", offer }));
     }
   };
 

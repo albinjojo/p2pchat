@@ -30,6 +30,17 @@ export class RoomSignal {
     const session: Session = { ws: server };
     this.sessions.push(session);
 
+    // The moment the room has both parties, tell them both. Whichever one
+    // was already connected and waiting learns a peer just arrived; the one
+    // that just connected learns a peer was already there. Either way, both
+    // sides now know it's safe to start the WebRTC offer/answer handshake —
+    // no more racing an offer against a guest who hasn't joined yet.
+    if (this.sessions.length === 2) {
+      for (const s of this.sessions) {
+        s.ws.send(JSON.stringify({ type: "peer-joined" }));
+      }
+    }
+
    server.addEventListener("message", (event) => {
       for (const other of this.sessions) {
         if (other !== session) other.ws.send(event.data as string);
