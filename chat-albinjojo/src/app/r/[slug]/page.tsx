@@ -56,7 +56,6 @@ export default function RoomPage() {
 
     connectionRef.current = await connectToRoom(
       slug,
-      "guest",
       data.access,
       handleIncoming,
       () => setStage("chat")
@@ -69,7 +68,11 @@ export default function RoomPage() {
     if (data.type === "nickname") {
       peerNickname.current = data.nickname;
     } else {
-      addMessage(peerNickname.current, data.text, false);
+      // Text messages may carry their own `from` — either the owner's
+      // nickname, or (when relayed through the owner from another guest)
+      // that guest's nickname. Falls back to the last-known nickname for
+      // safety, but with forwarding in place every message should have one.
+      addMessage(data.from || peerNickname.current, data.text, false);
     }
   }
 

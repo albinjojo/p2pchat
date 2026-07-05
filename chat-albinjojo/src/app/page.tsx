@@ -1,10 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2 } from "lucide-react";
-import { connectToRoom, sendMessage, ChatConnection } from "@/lib/webrtc";
+import { connectOwnerToRoom, OwnerConnection } from "@/lib/webrtc";
 import { useVanishMessages } from "@/lib/useVanishMessages";
 import { ChatThread } from "@/components/ChatThread";
 import { OnboardingGuide } from "@/components/OnboardingGuide";
@@ -66,7 +66,7 @@ export default function Lobby() {
   const [activeSlug, setActiveSlug] = useState<string | null>(null);
   const { messages, addMessage, clear, vanishOn, setVanishOn } = useVanishMessages();
   const [input, setInput] = useState("");
-  const [connection, setConnection] = useState<ChatConnection | null>(null);
+  const [ownerConnection, setOwnerConnection] = useState<OwnerConnection | null>(null);
   const [myNickname, setMyNickname] = useState("");
 
   useEffect(() => {
@@ -122,8 +122,8 @@ export default function Lobby() {
     setToken(null);
     setActiveSlug(null);
     clear();
-    connection?.close();
-    setConnection(null);
+    ownerConnection?.close();
+    setOwnerConnection(null);
   }
 
   async function createRoom() {
@@ -213,41 +213,37 @@ export default function Lobby() {
     fetchNotes();
   }
 
-  const peerNickname = useRef("them");
-
   async function openRoom(slug: string) {
-    connection?.close();
+    ownerConnection?.close();
     setActiveSlug(slug);
     clear();
-    peerNickname.current = "them";
-    const conn = await connectToRoom(
+
+    const conn = await connectOwnerToRoom(
       slug,
-      "owner",
-      undefined,
-      (raw) => {
-        const data = JSON.parse(raw);
-        if (data.type === "nickname") {
-          peerNickname.current = data.nickname;
-        } else if (data.type === "text") {
-          addMessage(peerNickname.current, data.text, false);
-        }
+      newMaxGuests,
+      (_guestId, nickname, text) => {
+        addMessage(nickname || "them", text, false);
       },
-      () => {},
-      newMaxGuests
+      () => {
+        // Guest left — webrtc.ts already cleaned up its own peer connection;
+        // no per-guest UI state to clear here yet.
+      }
     );
-    setConnection(conn);
+    setOwnerConnection(conn);
   }
 
   function send() {
-    if (!input.trim() || !connection) return;
-    sendMessage(connection, JSON.stringify({ type: "text", text: input }));
+    if (!input.trim() || !ownerConnection) return;
+    ownerConnection.sendToAll(
+      JSON.stringify({ type: "text", text: input, from: myNickname || "Admin" })
+    );
     addMessage("me", input, true);
     setInput("");
   }
 
   function sendNickname() {
-    if (!myNickname.trim() || !connection) return;
-    sendMessage(connection, JSON.stringify({ type: "nickname", nickname: myNickname }));
+    if (!myNickname.trim() || !ownerConnection) return;
+    ownerConnection.sendToAll(JSON.stringify({ type: "nickname", nickname: myNickname }));
   }
 
   const viewingNote = notes.find((n) => n.id === viewingNoteId) ?? null;

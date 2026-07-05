@@ -1,5 +1,12 @@
 interface Session {
+  id: string;
   ws: WebSocket;
+  role: "owner" | "guest" | null;
+}
+
+interface SignalMessage {
+  to?: string;
+  [key: string]: unknown;
 }
 
 export class RoomSignal {
@@ -12,7 +19,7 @@ export class RoomSignal {
     }
 
     const url = new URL(request.url);
-    const role = url.searchParams.get("role");
+    const role = url.searchParams.get("role") as "owner" | "guest" | null;
     const maxParam = url.searchParams.get("max");
 
     if (role === "owner" && maxParam) {
@@ -27,28 +34,42 @@ export class RoomSignal {
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
     server.accept();
 
-    const session: Session = { ws: server };
+    const id = crypto.randomUUID();
+    const session: Session = { id, ws: server, role };
     this.sessions.push(session);
 
-    // The moment the room has both parties, tell them both. Whichever one
-    // was already connected and waiting learns a peer just arrived; the one
-    // that just connected learns a peer was already there. Either way, both
-    // sides now know it's safe to start the WebRTC offer/answer handshake —
-    // no more racing an offer against a guest who hasn't joined yet.
-    if (this.sessions.length === 2) {
-      for (const s of this.sessions) {
-        s.ws.send(JSON.stringify({ type: "peer-joined" }));
+    if (role === "guest") {
+      const owner = this.sessions.find((s) => s.role === "owner");
+      if (owner) {
+        owner.ws.send(JSON.stringify({ type: "peer-joined", peerId: id }));
+        session.ws.send(JSON.stringify({ type: "peer-joined", peerId: owner.id }));
+      }
+    } else if (role === "owner") {
+      const existingGuests = this.sessions.filter((s) => s.role === "guest");
+      for (const guest of existingGuests) {
+        session.ws.send(JSON.stringify({ type: "peer-joined", peerId: guest.id }));
       }
     }
 
-   server.addEventListener("message", (event) => {
-      for (const other of this.sessions) {
-        if (other !== session) other.ws.send(event.data as string);
+    server.addEventListener("message", (event) => {
+      let msg: SignalMessage;
+      try {
+        msg = JSON.parse(event.data as string);
+      } catch {
+        return;
       }
+
+      const target = this.sessions.find((s) => s.id === msg.to);
+      target?.ws.send(JSON.stringify({ ...msg, from: session.id }));
     });
 
-   server.addEventListener("close", () => {
+    server.addEventListener("close", () => {
       this.sessions = this.sessions.filter((s) => s !== session);
+
+      if (session.role === "guest") {
+        const owner = this.sessions.find((s) => s.role === "owner");
+        owner?.ws.send(JSON.stringify({ type: "peer-left", peerId: session.id }));
+      }
     });
 
     return new Response(null, { status: 101, webSocket: client });
