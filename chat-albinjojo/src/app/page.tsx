@@ -259,7 +259,8 @@ export default function Lobby() {
   const viewingNote = notes.find((n) => n.id === viewingNoteId) ?? null;
 
   return (
-    <main className={`mx-auto w-full px-6 py-10 ${token ? "max-w-5xl" : "max-w-xl"}`}>
+    <main className={`mx-auto w-full px-4 py-10 sm:px-6 lg:px-8 ${token ? "max-w-5xl" : "max-w-xl"}`}>
+      <div className="content-panel w-full p-5 sm:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold">
@@ -622,6 +623,7 @@ export default function Lobby() {
           </div>
         </div>
       )}
+      </div>
     </main>
   );
 }

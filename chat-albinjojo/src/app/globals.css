@@ -89,6 +89,13 @@ body {
     box-shadow: 4px 4px 0 0 var(--ink);
   }
 
+  .content-panel {
+    background: var(--bg);
+    border: 2.5px solid var(--ink);
+    border-radius: 1.25rem;
+    box-shadow: 5px 5px 0 0 var(--ink);
+  }
+
   .tag-badge {
     display: inline-flex;
     align-items: center;

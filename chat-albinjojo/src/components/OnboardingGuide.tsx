@@ -78,12 +78,12 @@ export function OnboardingGuide({ hidden = false }: { hidden?: boolean }) {
         />
       </div>
 
-      <div className="h-[220px] w-[220px] sm:h-[280px] sm:w-[280px]" aria-hidden>
+      <div className="-mb-16 h-[150px] w-[150px] sm:-mb-20 sm:h-[190px] sm:w-[190px]" aria-hidden>
         <DotLottieReact
           src={WALK_ANIMATION_SRC}
           loop
           autoplay
-          layout={{ fit: "cover", align: [0.5, 0.5] }}
+          layout={{ fit: "cover", align: [0.5, 0] }}
         />
       </div>
     </section>
