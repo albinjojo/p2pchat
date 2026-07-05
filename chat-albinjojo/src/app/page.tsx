@@ -233,9 +233,9 @@ export default function Lobby() {
   }
 
   function send() {
-    if (!input.trim() || !ownerConnection) return;
+    if (!input.trim() || !myNickname.trim() || !ownerConnection) return;
     ownerConnection.sendToAll(
-      JSON.stringify({ type: "text", text: input, from: myNickname || "Admin" })
+      JSON.stringify({ type: "text", text: input, from: myNickname })
     );
     addMessage("me", input, true);
     setInput("");
@@ -543,9 +543,14 @@ export default function Lobby() {
                       value={input}
                       onChange={(e) => setInput(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && send()}
-                      placeholder="Type a message"
+                      placeholder={myNickname.trim() ? "Type a message" : "Set your nickname above first"}
+                      disabled={!myNickname.trim()}
                     />
-                    <button className="hard-btn hard-btn-primary" onClick={send}>
+                    <button
+                      className="hard-btn hard-btn-primary"
+                      onClick={send}
+                      disabled={!myNickname.trim() || !input.trim()}
+                    >
                       Send
                     </button>
                   </div>

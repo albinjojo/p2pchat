@@ -25,6 +25,7 @@ export default function RoomPage() {
   const [answer, setAnswer] = useState("");
   const [error, setError] = useState("");
   const [nickname, setNickname] = useState("");
+  const [nicknameError, setNicknameError] = useState("");
   const { messages, addMessage, clear, vanishOn, setVanishOn } = useVanishMessages();
   const [input, setInput] = useState("");
   const connectionRef = useRef<ChatConnection | null>(null);
@@ -77,10 +78,14 @@ export default function RoomPage() {
   }
 
   function submitNickname() {
+    if (!nickname.trim()) {
+      setNicknameError("Please enter a nickname");
+      return;
+    }
     if (connectionRef.current) {
       sendMessage(
         connectionRef.current,
-        JSON.stringify({ type: "nickname", nickname })
+        JSON.stringify({ type: "nickname", nickname: nickname.trim() })
       );
     }
     setStage("chat");
@@ -145,13 +150,21 @@ export default function RoomPage() {
             <input
               className="hard-input mb-3"
               value={nickname}
-              onChange={(e) => setNickname(e.target.value)}
+              onChange={(e) => {
+                setNickname(e.target.value);
+                if (nicknameError) setNicknameError("");
+              }}
               onKeyDown={(e) => e.key === "Enter" && submitNickname()}
               placeholder="Nickname"
             />
-            <button className="hard-btn hard-btn-primary w-full justify-center" onClick={submitNickname}>
+            <button
+              className="hard-btn hard-btn-primary w-full justify-center"
+              onClick={submitNickname}
+              disabled={!nickname.trim()}
+            >
               Continue
             </button>
+            {nicknameError && <p className="mt-3 font-mono text-[10px] text-red">{nicknameError}</p>}
           </motion.div>
         )}
 

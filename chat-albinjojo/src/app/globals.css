@@ -187,6 +187,11 @@ body {
     background: #fff;
   }
 
+  .hard-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
   .scroll-thin {
     scrollbar-width: thin;
     scrollbar-color: var(--ink) var(--bg-alt);
